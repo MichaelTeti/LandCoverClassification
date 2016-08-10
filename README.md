@@ -1,2 +1,3 @@
-# Land Cover Classification 
-# Indian Pines Hyperspectral Dataset
+# Land Cover Classification using Block Coding and LCA
+
+
