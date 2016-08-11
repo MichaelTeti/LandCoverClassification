@@ -12,46 +12,44 @@ import tensorflow as tf
 a=loadmat('Indian_pines_corrected.mat')
 b=loadmat('Indian_pines_gt.mat')
 gt=b['indian_pines_gt']
-gt=np.lib.pad(gt, ((2, 2), (2, 2)), 'edge')
+gt=np.pad(gt, (4, 4), 'edge')
 data=a['indian_pines_corrected']
+data=np.pad(data, (4, 4), 'edge')
 channels=np.ma.shape(data)
-depth=channels[2]
-dta=np.zeros([149, 149, 200])
-for i in range(depth):
-	d=data[:, :, i]
-	d=np.lib.pad(d, ((2, 2), (2, 2)), 'edge')
-	dta[:, :, i]=d
-data=dta
+depth=200
 output=np.ndarray.max(gt)+1
-batch=65
-h1=900
-h2=900
-h3=900
-h4=900
+batch=100
+c1=75
+c2=150
+c3=300
+c4=400
+h1=600
+h2=600
+h3=600
 
 sess=tf.InteractiveSession() # begin tensorflow session
 
-x = tf.placeholder(tf.float32, shape=[None, depth*9])
+x = tf.placeholder(tf.float32, shape=[None, depth*49])
 y = tf.placeholder(tf.float32, shape=[None, output])
 keep_prob = tf.placeholder(tf.float32)
 
 def training_set(X, y):
-	td=np.empty([1, depth*9])
+	td=np.empty([1, depth*49])
 	labels=np.zeros([batch, 17])
-	rr=np.arange(2, 145)
-	rrow=np.random.permutation(rr)
-	rrow=rrow[0:batch]
-	rc=np.arange(2,145)
-	rcol=np.random.permutation(rc)
-	rcol=rcol[0:batch]
-	for i in range(np.ma.size(rrow)):
-		train_data=X[rrow[i]-1:rrow[i]+2, rcol[i]-1:rcol[i]+2, :]
+	for i in range(batch):
+		rr=np.arange(4, 149)
+		rrow=np.random.permutation(rr)
+		rcol=np.random.permutation(rr)
+		train_data=X[rrow[0]-3:rrow[0]+4, rcol[0]-3:rcol[0]+4, 4:204]
 		train_data=train_data.flatten()
 		train_data=train_data[np.newaxis, :]
 		td=np.concatenate((td, train_data), axis=0)
-		label=y[rrow[i], rcol[i]]
+		label=y[rrow[0], rcol[0]]
 		labels[i, label]=1
 	td=td[1:, :]
+	if np.ma.size(td, 0)!=batch:
+		print 'Data not loaded correctly. Goodbye'
+		sys.exit()
 	return td, labels
 
 # create small, random weights
@@ -71,10 +69,19 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
+X=tf.reshape(x, [-1, 7, 7, 200])
+w1=weight_variable([2, 2, depth, c1])
+bias1=bias_variable([c1])
+act1=max_pool_2x2(tf.nn.relu(conv2d(X, w1)+bias1))
 
-theta1=weight_variable([depth*9, h1])
+w2=weight_variable([2, 2, c1, c2])
+bias2=bias_variable([c2])
+act2=max_pool_2x2(tf.nn.relu(conv2d(act1, w2)+bias2))
+act2flat=tf.reshape(act2, [-1, 4*c2])
+
+theta1=weight_variable([4*c2, h1])
 bias1=bias_variable([h1])
-activation2=tf.nn.relu(tf.matmul(x, theta1) + bias1)
+activation2=tf.nn.relu(tf.matmul(act2flat, theta1) + bias1)
 activation2 = tf.nn.dropout(activation2, keep_prob)
 
 theta2=weight_variable([h1, h2])
@@ -82,19 +89,9 @@ bias2=bias_variable([h2])
 activation3=tf.nn.relu(tf.matmul(activation2, theta2) + bias2)
 activation3=tf.nn.dropout(activation3, keep_prob)
 
-theta3=weight_variable([h2, h3])
-bias3=bias_variable([h3])
-activation4=tf.nn.relu(tf.matmul(activation3, theta3) + bias3)
-activation4=tf.nn.dropout(activation4, keep_prob)
-
-theta4=weight_variable([h3, h4])
-bias4=bias_variable([h4])
-activation5=tf.nn.relu(tf.matmul(activation4, theta4) + bias4)
-activation5=tf.nn.dropout(activation5, keep_prob)
-
-theta5=weight_variable([h4, output])
-bias5=bias_variable([output])
-out=tf.nn.softmax(tf.matmul(activation5, theta5) + bias5)
+theta3=weight_variable([h2, output])
+bias3=bias_variable([output])
+out=tf.nn.softmax(tf.matmul(activation3, theta3) + bias3)
 
 cost = tf.reduce_mean(-tf.reduce_sum(y * tf.log(out), reduction_indices=[1]))
 
@@ -114,5 +111,4 @@ for i in range(training_iters):
         x:train_data, y:train_labels, keep_prob: 1.0})
     print("step %d, training accuracy %g"%(i, train_accuracy))
     #tf.Print(y_, train_labels)
-  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.6})
-
+  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.75})
