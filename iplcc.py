@@ -9,25 +9,30 @@ import tensorflow as tf
 
 
 # load data and ground truth
-a=loadmat('Indian_pines_corrected.mat')
+a=loadmat('ipwhitened.mat')
 b=loadmat('Indian_pines_gt.mat')
 gt=b['indian_pines_gt']
 gt=np.pad(gt, (4, 4), 'edge')
-data=a['indian_pines_corrected']
+data=a['data']
 data=np.pad(data, (4, 4), 'edge')
-channels=np.ma.shape(data)
+ro, co=np.where(gt==10)
+gt[ro, co]=2
+ro, co=np.where(gt==3)
+gt[ro, co]=11
+ro, co=np.where(gt==7)
+gt[ro, co]=5	
 depth=200
 output=np.ndarray.max(gt)+1
 batch=100
 c1=75
-c2=150
+c2=200
 c3=300
-c4=400
-h1=600
-h2=600
-h3=600
+c4=200
+h1=400
+h2=400
 
 sess=tf.InteractiveSession() # begin tensorflow session
+
 
 x = tf.placeholder(tf.float32, shape=[None, depth*49])
 y = tf.placeholder(tf.float32, shape=[None, output])
@@ -40,13 +45,17 @@ def training_set(X, y):
 		rr=np.arange(4, 149)
 		rrow=np.random.permutation(rr)
 		rcol=np.random.permutation(rr)
-		train_data=X[rrow[0]-3:rrow[0]+4, rcol[0]-3:rcol[0]+4, 4:204]
+		train_data=X[rrow[0]-3:rrow[0]+4, rcol[0]-3:rcol[0]+4, 4:depth+4]
 		train_data=train_data.flatten()
 		train_data=train_data[np.newaxis, :]
 		td=np.concatenate((td, train_data), axis=0)
 		label=y[rrow[0], rcol[0]]
 		labels[i, label]=1
 	td=td[1:, :]
+	mu=np.mean(td, axis=0)
+	sigma=np.std(td, axis=0)
+	td=np.divide((td-mu), sigma)
+	td=np.nan_to_num(td)
 	if np.ma.size(td, 0)!=batch:
 		print 'Data not loaded correctly. Goodbye'
 		sys.exit()
@@ -69,15 +78,16 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-X=tf.reshape(x, [-1, 7, 7, 200])
-w1=weight_variable([2, 2, depth, c1])
+X=tf.reshape(x, [-1, 7, 7, depth])
+w1=weight_variable([1, 3, depth, c1])
 bias1=bias_variable([c1])
 act1=max_pool_2x2(tf.nn.relu(conv2d(X, w1)+bias1))
 
-w2=weight_variable([2, 2, c1, c2])
+w2=weight_variable([3, 1, c1, c2])
 bias2=bias_variable([c2])
 act2=max_pool_2x2(tf.nn.relu(conv2d(act1, w2)+bias2))
 act2flat=tf.reshape(act2, [-1, 4*c2])
+
 
 theta1=weight_variable([4*c2, h1])
 bias1=bias_variable([h1])
