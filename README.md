@@ -1,3 +1,2 @@
-# Land Cover Feature Learning using Block Coding and LCA
+# Land Cover Classification of hyperspectral scene using CNN
 
-![alt tag](https://github.com/MichaelTeti/LandCoverClassification/blob/master/untitled.jpg)
