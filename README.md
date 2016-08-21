@@ -1,3 +1,3 @@
 # Hyperspectral Land Cover Classification
 
-![alt tag](https://github.com/MichaelTeti/LandCoverClassification/Pavia60.png)
+![alt tag](https://github.com/MichaelTeti/LandCoverClassification/blob/master/Pavia_60.png)
