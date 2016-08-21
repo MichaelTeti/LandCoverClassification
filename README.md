@@ -1,2 +1,3 @@
-# Land Cover Classification of hyperspectral scene using CNN
+# Hyperspectral Land Cover Classification
+
 
