@@ -1,3 +1,27 @@
+###################################################################################################
+#--------------------------------------------------------------------------------------------------
+#
+#                                  Michael A. Teti
+# 
+#                Machine Perception and Cognitive Robotics Laboratory
+# 
+#                   Center for Complex Systems and Brain Sciences 
+#
+#                          Florida Atlantic University
+#
+###################################################################################################
+#--------------------------------------------------------------------------------------------------
+###################################################################################################
+#
+# This convolutional neural network was developed to classify pixels contained in remotely-sensed
+# hyperspectral images obtained from the following source:
+# 
+# http://www.ehu.eus/ccwintco/index.php?title=Hyperspectral_Remote_Sensing_Scenes
+#
+#--------------------------------------------------------------------------------------------------
+###################################################################################################
+
+
 import scipy
 from scipy.io import loadmat
 import scipy.misc
@@ -11,17 +35,17 @@ import tensorflow as tf
 # load data and ground truth
 a=loadmat('Pavia.mat') # .mat file that has the data
 b=loadmat('Pavia_gt.mat') # load .mat file with the ground truth
-gt=b['pavia_gt'] 
-gt=np.pad(gt, (4, 4), 'edge') # pad ground truth to coincide with data
+gt=b['pavia_gt']
+ps=4 
+gt=np.pad(gt, (ps, ps), 'edge') # pad ground truth to coincide with data
 data=a['pavia']
 depth=np.ma.size(data, 2) # number of bands used in sensing
-data=np.pad(data, (4, 4), 'edge') # pad the data matrix to select patches
+data=np.pad(data, (ps, ps), 'edge') # pad the data matrix to select patches
 output=np.ndarray.max(gt) # 9 output nodes in CNN for 9 classes in scene
-batch=100 # training batch size
-c1=75 # convolutions in layer 1
-c2=200 # convolutions in layer 2
-h1=400 # nodes in 1st fully-connected layer
-h2=400 # nodes in second fully-connected layer
+batch=1000 # training batch size
+c1=65 # convolutions in layer 1
+c2=65 # convolutions in layer 2
+h1=np.round(((4*c2)/2), decimals=0) # nodes in 1st fully-connected layer
 
 sess=tf.InteractiveSession() # begin tensorflow interactive session
 
@@ -40,16 +64,16 @@ def training_set(X, y):
 		train_pixelr=train_pixelr[randp[0]]
 		train_pixelc=train_pixelc[randp[0]]
 		# Don't select padded elements - leave space for patch size
-		if train_pixelr<4: 
-			train_pixelr=4
-		elif train_pixelr>(np.ma.size(y, 0)-4):
-			train_pixelr=np.ma.size(y, 0)-4
-		if train_pixelc<4:
-			train_pixelc=4
-		elif train_pixelc>(np.ma.size(y, 1)-4):
-			train_pixelc=np.ma.size(y, 1)-4
+		if train_pixelr<ps: 
+			train_pixelr=ps
+		elif train_pixelr>(np.ma.size(y, 0)-ps):
+			train_pixelr=np.ma.size(y, 0)-ps
+		if train_pixelc<ps:
+			train_pixelc=ps
+		elif train_pixelc>(np.ma.size(y, 1)-ps):
+			train_pixelc=np.ma.size(y, 1)-ps
 		# select 7x7 patches with the pixel to be classified in the center
-		train_data=X[train_pixelr-3:train_pixelr+4, train_pixelc-3:train_pixelc+4, 4:depth+4]
+		train_data=X[train_pixelr-(ps-1):train_pixelr+ps, train_pixelc-(ps-1):train_pixelc+ps, ps:depth+ps]
 		train_data=train_data.flatten()
 		train_data=train_data[np.newaxis, :]
 		td=np.concatenate((td, train_data), axis=0)
@@ -65,6 +89,7 @@ def training_set(X, y):
 		print 'Data not loaded correctly. Goodbye'
 		sys.exit()
 	return td, labels
+
 
 # create small, random weights
 def weight_variable(shape):
@@ -85,29 +110,28 @@ def max_pool_2x2(x):
 
 # first convolutional layer 
 X=tf.reshape(x, [-1, 7, 7, depth]) # reshape training example into 7x7x103 patches
-w1=weight_variable([1, 3, depth, c1]) # first convolutional layer is 1x3
+w1=weight_variable([2, 2, depth, c1]) # first convolutional layer is 1x3
 bias1=bias_variable([c1])
 act1=max_pool_2x2(tf.nn.relu(conv2d(X, w1)+bias1)) # apply convolutions, rectified linear activation function, and max pooling
 
-w2=weight_variable([3, 1, c1, c2]) # second convolutional layer is 3x1
+w2=weight_variable([2, 2, c1, c2]) # second convolutional layer is 3x1
 bias2=bias_variable([c2])
 act2=max_pool_2x2(tf.nn.relu(conv2d(act1, w2)+bias2))
 act2flat=tf.reshape(act2, [-1, 4*c2]) # reshape layer 2 activations into a vector for fully-connected layer
 
-
 theta1=weight_variable([4*c2, h1]) # weights for fully-connected layer
-bias1=bias_variable([h1]) # bias for first fully-connected layer
-activation2=tf.nn.relu(tf.matmul(act2flat, theta1) + bias1) # activations for fully-connected layer
+bias3=bias_variable([h1]) # bias for first fully-connected layer
+activation2=tf.nn.relu(tf.matmul(act2flat, theta1) + bias3) # activations for fully-connected layer
 activation2 = tf.nn.dropout(activation2, keep_prob) # apply dropout to activations to avoid overfitting
 
-theta2=weight_variable([h1, h2]) # weights for second fully-connected layer
-bias2=bias_variable([h2]) # bias for 2nd layer
-activation3=tf.nn.relu(tf.matmul(activation2, theta2) + bias2) # multiply activations from layer one by weights and add bias
+theta2=weight_variable([h1, h1]) # weights for second fully-connected layer
+bias4=bias_variable([h1]) # bias for 2nd layer
+activation3=tf.nn.relu(tf.matmul(activation2, theta2) + bias4) # multiply activations from layer one by weights and add bias
 activation3=tf.nn.dropout(activation3, keep_prob) # apply dropout to this layer of activations too
 
-theta3=weight_variable([h2, output]) # weights for final layer of the network (output layer)
-bias3=bias_variable([output]) # biases for the output nodes
-out=tf.nn.softmax(tf.matmul(activation3, theta3) + bias3) # send through a softmax regression function 
+theta3=weight_variable([h1, output]) # weights for final layer of the network (output layer)
+bias5=bias_variable([output]) # biases for the output nodes
+out=tf.nn.softmax(tf.matmul(activation3, theta3) + bias5) # send through a softmax regression function 
 
 
 # calculate cross-entropy cost function to use with backpropagation
@@ -122,16 +146,21 @@ correct_prediction = tf.equal(tf.argmax(out, 1), tf.argmax(y, 1))
 # calculate the mean for the training batch
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
+saver=tf.train.Saver()
+
 sess.run(tf.initialize_all_variables()) # initialize the tensorflow variables
 
-training_iters=1000 
+training_iters=550
 
 # training
 for i in range(training_iters):
   train_data, train_labels=training_set(data, gt)
-  if i%100 == 0:
+  if i%5 == 0:
     train_accuracy = accuracy.eval(feed_dict={
         x:train_data, y:train_labels, keep_prob: 1.0})
     print("step %d, training accuracy %g"%(i, train_accuracy))
     #tf.Print(y_, train_labels)
-  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.7})
+  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.75})
+
+print ('Saving variables...')
+save_variables=saver.save(sess, '/home/mpcr/Desktop/Indian_pines/hyperspectral.ckpt')
