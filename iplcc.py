@@ -44,8 +44,8 @@ data=np.pad(data, (ps, ps), 'edge') # pad the data matrix to select patches
 output=np.ndarray.max(gt) # 9 output nodes in CNN for 9 classes in scene
 batch=1000 # training batch size
 c1=65 # convolutions in layer 1
-c2=65 # convolutions in layer 2
-h1=np.round(((4*c2)/2), decimals=0) # nodes in 1st fully-connected layer
+c2=70 # convolutions in layer 2
+h1=np.round((4*c2/2), decimals=0) # nodes in 1st fully-connected layer
 
 sess=tf.InteractiveSession() # begin tensorflow interactive session
 
@@ -108,25 +108,25 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-# first convolutional layer 
+# first convolutional layer
 X=tf.reshape(x, [-1, 7, 7, depth]) # reshape training example into 7x7x103 patches
 w1=weight_variable([2, 2, depth, c1]) # first convolutional layer is 1x3
 bias1=bias_variable([c1])
-act1=max_pool_2x2(tf.nn.relu(conv2d(X, w1)+bias1)) # apply convolutions, rectified linear activation function, and max pooling
+act1=max_pool_2x2(tf.nn.elu(conv2d(X, w1)+bias1)) # apply convolutions, rectified linear activation function, and max pooling
 
 w2=weight_variable([2, 2, c1, c2]) # second convolutional layer is 3x1
 bias2=bias_variable([c2])
-act2=max_pool_2x2(tf.nn.relu(conv2d(act1, w2)+bias2))
+act2=max_pool_2x2(tf.nn.elu(conv2d(act1, w2)+bias2))
 act2flat=tf.reshape(act2, [-1, 4*c2]) # reshape layer 2 activations into a vector for fully-connected layer
 
 theta1=weight_variable([4*c2, h1]) # weights for fully-connected layer
 bias3=bias_variable([h1]) # bias for first fully-connected layer
-activation2=tf.nn.relu(tf.matmul(act2flat, theta1) + bias3) # activations for fully-connected layer
+activation2=tf.nn.elu(tf.matmul(act2flat, theta1) + bias3) # activations for fully-connected layer
 activation2 = tf.nn.dropout(activation2, keep_prob) # apply dropout to activations to avoid overfitting
 
 theta2=weight_variable([h1, h1]) # weights for second fully-connected layer
 bias4=bias_variable([h1]) # bias for 2nd layer
-activation3=tf.nn.relu(tf.matmul(activation2, theta2) + bias4) # multiply activations from layer one by weights and add bias
+activation3=tf.nn.elu(tf.matmul(activation2, theta2) + bias4) # multiply activations from layer one by weights and add bias
 activation3=tf.nn.dropout(activation3, keep_prob) # apply dropout to this layer of activations too
 
 theta3=weight_variable([h1, output]) # weights for final layer of the network (output layer)
@@ -150,7 +150,7 @@ saver=tf.train.Saver()
 
 sess.run(tf.initialize_all_variables()) # initialize the tensorflow variables
 
-training_iters=550
+training_iters=525
 
 # training
 for i in range(training_iters):
@@ -160,7 +160,7 @@ for i in range(training_iters):
         x:train_data, y:train_labels, keep_prob: 1.0})
     print("step %d, training accuracy %g"%(i, train_accuracy))
     #tf.Print(y_, train_labels)
-  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.75})
+  train_step.run(feed_dict={x: train_data, y: train_labels, keep_prob: 0.5})
 
 print ('Saving variables...')
 save_variables=saver.save(sess, '/home/mpcr/Desktop/Indian_pines/hyperspectral.ckpt')
